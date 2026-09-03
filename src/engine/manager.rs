@@ -1,4 +1,10 @@
-use std::{collections::{HashMap, VecDeque}, fs::OpenOptions, os::unix::fs::FileExt, path::Path, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    fs::OpenOptions,
+    os::unix::fs::FileExt,
+    path::Path,
+    sync::Arc,
+};
 
 use anyhow::{Result, anyhow};
 use tokio::sync::{Mutex, OwnedRwLockWriteGuard, RwLock};
@@ -103,8 +109,8 @@ impl BufferPoolManager {
                 }
             }
 
-            let (fid, old_pid, is_dirty) = evicted_fid
-                .ok_or_else(|| anyhow!("Buffer pool full: all pages are pinned"))?;
+            let (fid, old_pid, is_dirty) =
+                evicted_fid.ok_or_else(|| anyhow!("Buffer pool full: all pages are pinned"))?;
 
             if is_dirty {
                 if let Some(opid) = old_pid {

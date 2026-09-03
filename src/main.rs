@@ -1,6 +1,6 @@
 use anyhow::{Result};
 use nosql::Database;
-use serde_json::json;
+use serde_json::{Value, json};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -58,7 +58,28 @@ async fn main() -> Result<()> {
         .await?;
     println!("Inserted Charlie with explicit _id: {:?}", res3);
 
-    // --- 3. QUERYING ---
+
+    // --- 3. INSERT MANY ---
+    println!("\n--- 1. INSERTING MANY DOCUMENTS (Auto UUID _id) ---");
+    let mut list: Vec<Value> = Vec::new();
+
+    for i in 0..5 {
+        list.push(json!({
+            "name": format!("Peterson-{}", i),
+            "email": format!("peterson-{}@gmail.com", i),
+            "role": "employee",
+            "status": "pending"
+        }));
+    }
+
+    let res_list = users
+        .insert_many(list)
+        .await
+        .unwrap();
+
+    println!("Inserted many users: {:?}", res_list);
+
+    // --- 4. QUERYING ---
     println!("\n--- 2. QUERYING DOCUMENTS ---");
     let alice = users.find_one(json!({ "_id": res1.inserted_id })).await?;
     println!("Find Alice by UUID _id:\n{:#?}", alice);
@@ -66,7 +87,7 @@ async fn main() -> Result<()> {
     let developers = users.find(json!({ "role": "developer" })).await?;
     println!("Find All Developers: Found {} records", developers.len());
 
-    // --- 4. BATCH UPDATE  ---
+    // --- 5. BATCH UPDATE  ---
     println!("\n--- 3. UPDATING MULTIPLE DOCUMENTS ---");
     let update_res = users
         .update(
@@ -79,7 +100,7 @@ async fn main() -> Result<()> {
     let updated_devs = users.find(json!({ "role": "developer" })).await?;
     println!("Developers after batch update:\n{:#?}", updated_devs);
 
-    // --- 5. BATCH DELETE ---
+    // --- 6. BATCH DELETE ---
     println!("\n--- 4. DELETING DOCUMENTS ---");
     let delete_res = users
         .delete(json!({ "role": "developer" }))

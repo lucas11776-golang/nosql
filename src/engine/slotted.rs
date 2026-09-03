@@ -1,6 +1,5 @@
 use crate::{PAGE_SIZE, PageId, SlotId};
 
-
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 struct Slot {
@@ -135,7 +134,13 @@ impl SlottedPage {
     pub fn delete(&mut self, slot_id: SlotId) -> bool {
         if let Some(slot) = self.get_slot(slot_id) {
             if slot.length > 0 {
-                self.set_slot(slot_id, Slot { offset: 0, length: 0 });
+                self.set_slot(
+                    slot_id,
+                    Slot {
+                        offset: 0,
+                        length: 0,
+                    },
+                );
                 return true;
             }
         }

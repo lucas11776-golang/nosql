@@ -100,8 +100,7 @@ impl Database {
         page.data[8..12].copy_from_slice(&len_bytes);
         page.data[12..12 + bytes.len()].copy_from_slice(&bytes);
 
-        self.disk_manager.write_page(0, &page.data)?;
-        Ok(())
+        self.disk_manager.write_page(0, &page.data)
     }
 
     pub async fn collection(self: &Arc<Self>, name: &str) -> Collection<'_> {
@@ -123,8 +122,7 @@ impl Database {
             .insert(collection.to_string(), HashMap::new());
         drop(cat);
 
-        self.persist_catalog().await?;
-        Ok(())
+        self.persist_catalog().await
     }
 
     pub async fn delete(&self, name: &str) -> Result<()> {
@@ -137,8 +135,7 @@ impl Database {
 
         drop(cat);
 
-        self.persist_catalog().await?;
-        Ok(())
+        self.persist_catalog().await
     }
 
     pub async fn rename(&self, collection_old: &str, collection_new: &str) -> Result<()> {
@@ -165,9 +162,7 @@ impl Database {
 
         drop(cat);
 
-        self.persist_catalog().await?;
-
-        Ok(())
+        self.persist_catalog().await
     }
 
     pub async fn has(&self, collection: &str) -> bool {

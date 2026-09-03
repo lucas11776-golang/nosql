@@ -164,6 +164,16 @@ impl<'a> Collection<'a> {
         Ok(InsertResult { inserted_id })
     }
 
+    pub async fn insert_many(&self, mut docs: Vec<Value>) -> Result<Vec<InsertResult>> {
+        let mut results: Vec<InsertResult> = Vec::new();
+
+        for doc in docs {
+            results.push(self.insert_one(doc).await.unwrap());
+        }
+
+        Ok(results)
+    }
+
     pub async fn find_one(&self, filter: Value) -> Result<Option<Value>> {
         let matches = self.find_internal_records(&filter, 1).await?;
         Ok(matches.into_iter().next().map(|(_, doc)| doc))
