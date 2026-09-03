@@ -11,10 +11,7 @@ pub struct Collection<'a> {
 
 impl<'a> Collection<'a> {
     pub fn new(db: &'a Database, name: String) -> Self {
-        Self {
-            db: db,
-            name: name
-        }
+        Self { db: db, name: name }
     }
 
     fn canonical_id_key(id_val: &Value) -> String {
@@ -81,10 +78,7 @@ impl<'a> Collection<'a> {
                 if let Some(bytes) = page_guard.get(slot_id) {
                     if let Ok(doc) = serde_json::from_slice::<Value>(bytes) {
                         if Self::match_filter(&doc, filter) {
-                            results.push((
-                                RecordId { page_id, slot_id },
-                                doc,
-                            ));
+                            results.push((RecordId { page_id, slot_id }, doc));
                             if results.len() >= limit {
                                 return Ok(results);
                             }
@@ -164,7 +158,7 @@ impl<'a> Collection<'a> {
         Ok(InsertResult { inserted_id })
     }
 
-    pub async fn insert_many(&self, mut docs: Vec<Value>) -> Result<Vec<InsertResult>> {
+    pub async fn insert_many(&self, docs: Vec<Value>) -> Result<Vec<InsertResult>> {
         let mut results: Vec<InsertResult> = Vec::new();
 
         for doc in docs {
