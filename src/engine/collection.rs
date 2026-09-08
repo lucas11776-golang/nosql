@@ -108,7 +108,12 @@ impl<'a> Collection<'a> {
         let mut target_page_id = None;
 
         let pages = {
-            let catalog = self.db.catalog.read().await;
+            let catalog = self
+                .db
+                .catalog
+                .read()
+                .await;
+
             catalog
                 .collections
                 .get(&self.name)
@@ -225,7 +230,10 @@ impl<'a> Collection<'a> {
     }
 
     pub async fn delete(&self, filter: Value) -> Result<DeleteResult> {
-        let matches = self.find_internal_records(&filter, usize::MAX).await?;
+        let matches = self
+            .find_internal_records(&filter, usize::MAX)
+            .await?;
+
         if matches.is_empty() {
             return Ok(DeleteResult { deleted_count: 0 });
         }
