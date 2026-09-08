@@ -6,6 +6,7 @@ A simple, asynchronous, lightweight NoSQL-like document database for Rust, built
 
 - **Asynchronous API**: Powered by `tokio`.
 - **Collection Management**: Create, rename, delete, and list collections.
+- **Unified Imports**: All types (`Database`, `Result`, `Value`, `json`) are conveniently re-exported directly from the root of the `nosql` crate.
 - **JSON-like Document CRUD**:
   - Insert single or multiple documents with automatic UUID generation or custom `_id`s.
   - Query using matching JSON criteria (`find`, `find_one`).
@@ -20,24 +21,26 @@ Add the following to your `Cargo.toml`:
 ```toml
 [dependencies]
 nosql = { path = "..." } # Replace with local path if used as a local dependency
-serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
-anyhow = "1.0"
 ```
 
 ## Quick Start
 
-Here is a quick overview of how to open a database, perform collection operations, and execute CRUD queries.
+Import everything you need directly from `nosql`:
+
+```rust
+use nosql::{Database, Result, Value, json};
+```
 
 ### 1. Opening and Closing the Database
 
 The database is backed by a binary file. Open it asynchronously using `Database::open`:
 
 ```rust
-use nosql::Database;
+use nosql::{Database, Result};
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     // Open (or create) the database file
     let db = Database::open("db.bin").await?;
 
@@ -80,7 +83,7 @@ let users = db.collection("users").await;
 If no `_id` is specified, a UUID is automatically generated for the document:
 
 ```rust
-use serde_json::json;
+use nosql::json;
 
 let res = users.insert_one(json!({
     "name": "Alice",
@@ -168,87 +171,115 @@ println!("Deleted {} documents.", delete_res.deleted_count);
 
 ## Complete Example
 
-Below is a complete, runnable example illustrating the full lifecycle of database and collection management.
+Below is the complete example matching `src/main.rs`, illustrating the full lifecycle of database and collection management using the unified imports.
 
 ```rust
-use anyhow::Result;
-use nosql::Database;
-use serde_json::{Value, json};
+use nosql::{Database, Result, Value, json};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // 1. Initialize the database
     let db = Database::open("db.bin").await?;
 
-    // 2. Collection Operations
-    let collection = "test_collection";
-    let renamed = "test_collection_renamed";
+    // --- 1. CREATE/DROP/RENAME COLLECTION ---
+
+    let collection = "test123";
+    let collection_renamed = "collection_renamed";
 
     db.create(collection).await?;
-    println!("Collections after creation: {:?}", db.list().await?);
 
-    db.rename(collection, renamed).await?;
-    println!("Collections after rename: {:?}", db.list().await?);
+    println!("\r\n NEW COLLECTIONS: {:?}", db.list().await);
 
-    db.delete(renamed).await?;
-    println!("Collections after deletion: {:?}", db.list().await?);
+    db.rename(collection, collection_renamed).await?;
 
-    // 3. Document Operations on "users" collection
+    println!("\r\n RENAMED COLLECTIONS: {:?}", db.list().await);
+
+    db.delete(collection_renamed).await.unwrap();
+
+    println!("\r\n COLLECTIONS: {:?}", db.list().await);
+
     let users = db.collection("users").await;
 
-    // --- Insert One ---
-    let res1 = users.insert_one(json!({
-        "name": "Alice",
-        "email": "alice@example.com",
-        "role": "developer",
-        "status": "pending"
-    })).await?;
-    println!("Inserted Alice: {:?}", res1);
-
-    // --- Insert One with Custom ID ---
-    let res2 = users.insert_one(json!({
-        "_id": "custom_id",
-        "name": "Charlie",
-        "role": "admin",
-        "status": "active"
-    })).await?;
-    println!("Inserted Charlie with custom ID: {:?}", res2);
-
-    // --- Insert Many ---
-    let mut batch = Vec::new();
-    for i in 1..=3 {
-        batch.push(json!({
-            "name": format!("User-{}", i),
-            "email": format!("user{}@example.com", i),
+    // --- 2. INSERT ONE ---
+    println!("\n--- 1. INSERTING DOCUMENTS (Auto UUID _id) ---");
+    let res1 = users
+        .insert_one(json!({
+            "name": "Alice",
+            "email": "alice@example.com",
             "role": "developer",
+            "status": "pending"
+        }))
+        .await?;
+    println!("Inserted Alice with auto-generated UUID _id: {:?}", res1);
+
+    let res2 = users
+        .insert_one(json!({
+            "name": "Bob",
+            "email": "bob@example.com",
+            "role": "developer",
+            "status": "pending"
+        }))
+        .await?;
+    println!("Inserted Bob with auto-generated UUID _id: {:?}", res2);
+
+    let res3 = users
+        .insert_one(json!({
+            "_id": "custom_id",
+            "name": "Charlie",
+            "email": "charlie@example.com",
+            "role": "admin",
+            "status": "active"
+        }))
+        .await?;
+    println!("Inserted Charlie with explicit _id: {:?}", res3);
+
+    // --- 3. INSERT MANY ---
+    println!("\n--- 1. INSERTING MANY DOCUMENTS (Auto UUID _id) ---");
+    let mut list: Vec<Value> = Vec::new();
+
+    for i in 0..5 {
+        list.push(json!({
+            "name": format!("Peterson-{}", i),
+            "email": format!("peterson-{}@gmail.com", i),
+            "role": "employee",
             "status": "pending"
         }));
     }
-    users.insert_many(batch).await?;
 
-    // --- Querying ---
-    // Find single document
-    let query_res = users.find_one(json!({ "_id": "custom_id" })).await?;
-    println!("Query result for custom_id:\n{:#?}", query_res);
+    let res_list = users.insert_many(list).await.unwrap();
 
-    // Find multiple documents
+    println!("Inserted many users: {:?}", res_list);
+
+    // --- 4. QUERYING ---
+    println!("\n--- 2. QUERYING DOCUMENTS ---");
+    let alice = users.find_one(json!({ "_id": res1.inserted_id })).await?;
+    println!("Find Alice by UUID _id:\n{:#?}", alice);
+
     let developers = users.find(json!({ "role": "developer" })).await?;
-    println!("Found {} developers.", developers.len());
+    println!("Find All Developers: Found {} records", developers.len());
 
-    // --- Updating ---
-    let update_res = users.update(
-        json!({ "status": "pending" }),
-        json!({ "status": "active", "verified": true }),
-    ).await?;
-    println!("Updated documents: {:?}", update_res);
+    // --- 5. BATCH UPDATE  ---
+    println!("\n--- 3. UPDATING MULTIPLE DOCUMENTS ---");
+    let update_res = users
+        .update(
+            json!({ "status": "pending" }),
+            json!({ "status": "active", "verified": true }),
+        )
+        .await?;
+    println!("Batch Update Result: {:?}", update_res);
 
-    // --- Deleting ---
+    let updated_devs = users.find(json!({ "role": "developer" })).await?;
+    println!("Developers after batch update:\n{:#?}", updated_devs);
+
+    // --- 6. BATCH DELETE ---
+    println!("\n--- 4. DELETING DOCUMENTS ---");
     let delete_res = users.delete(json!({ "role": "developer" })).await?;
-    println!("Deleted documents: {:?}", delete_res);
+    println!("Batch Delete Result: {:?}", delete_res);
 
-    // 4. Safely Close Database
+    let remaining_users = users.find(json!({})).await?;
+    println!("Remaining users in collection:\n{:#?}", remaining_users);
+
     db.close().await?;
-    println!("Database closed cleanly.");
+    println!("\nDatabase operation completed cleanly.");
 
     Ok(())
 }

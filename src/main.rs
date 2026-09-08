@@ -1,6 +1,4 @@
-use anyhow::{Result};
-use nosql::Database;
-use serde_json::{Value, json};
+use nosql::{Database, Result, Value, json};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,7 +16,7 @@ async fn main() -> Result<()> {
     db.rename(collection, collection_renamed).await?;
 
     println!("\r\n RENAMED COLLECTIONS: {:?}", db.list().await);
-    
+
     db.delete(collection_renamed).await.unwrap();
 
     println!("\r\n COLLECTIONS: {:?}", db.list().await);
@@ -58,7 +56,6 @@ async fn main() -> Result<()> {
         .await?;
     println!("Inserted Charlie with explicit _id: {:?}", res3);
 
-
     // --- 3. INSERT MANY ---
     println!("\n--- 1. INSERTING MANY DOCUMENTS (Auto UUID _id) ---");
     let mut list: Vec<Value> = Vec::new();
@@ -72,10 +69,7 @@ async fn main() -> Result<()> {
         }));
     }
 
-    let res_list = users
-        .insert_many(list)
-        .await
-        .unwrap();
+    let res_list = users.insert_many(list).await.unwrap();
 
     println!("Inserted many users: {:?}", res_list);
 
@@ -102,9 +96,7 @@ async fn main() -> Result<()> {
 
     // --- 6. BATCH DELETE ---
     println!("\n--- 4. DELETING DOCUMENTS ---");
-    let delete_res = users
-        .delete(json!({ "role": "developer" }))
-        .await?;
+    let delete_res = users.delete(json!({ "role": "developer" })).await?;
     println!("Batch Delete Result: {:?}", delete_res);
 
     let remaining_users = users.find(json!({})).await?;
