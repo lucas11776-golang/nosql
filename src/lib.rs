@@ -10,8 +10,7 @@ use crate::engine::slotted::SlottedPage;
 
 mod engine;
 
-pub use serde_json::json;
-pub use serde_json::Value;
+pub use serde_json::{json, Value};
 pub use anyhow::Result;
 
 pub const PAGE_SIZE: usize = 4096;
