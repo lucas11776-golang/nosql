@@ -1,6 +1,6 @@
 [package]
 name = "nosql"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Themba Lucas Ngubeni <thembangubeni04@email.com>"]
 license = "MIT"
 description = "NoSql custom database"
@@ -8,6 +8,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
+bytes = "1.12.1"
 futures = "0.3.34"
 rand = "0.10.2"
 serde = { version = "1.0.229", features=["derive"] }

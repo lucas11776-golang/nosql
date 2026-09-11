@@ -8,7 +8,8 @@ use crate::engine::collection::Collection;
 use crate::engine::manager::{BufferPoolManager, DiskManager};
 use crate::engine::slotted::SlottedPage;
 
-mod engine;
+pub mod engine;
+pub mod connection;
 
 pub use serde_json::{json, Value};
 pub use anyhow::Result;
@@ -105,12 +106,12 @@ impl Database {
         self.disk_manager.write_page(0, &page.data)
     }
 
-    pub async fn collection(self: &Arc<Self>, name: &str) -> Collection<'_> {
+    pub async fn collection(self: &Arc<Self>, name: &str) -> Collection {
         let mut cat = self.catalog.write().await;
         cat.collections.entry(name.to_string()).or_default();
         cat.primary_indexes.entry(name.to_string()).or_default();
 
-        Collection::new(self, String::from(name))
+        Collection::new(Arc::clone(&self), String::from(name))
     }
 
     pub async fn create(&self, collection: &str) -> Result<()> {

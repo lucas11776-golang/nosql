@@ -1,16 +1,18 @@
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{Database, DeleteResult, InsertResult, RecordId, UpdateResult};
 
-pub struct Collection<'a> {
-    pub(crate) db: &'a Database,
+pub struct Collection {
+    pub(crate) db: Arc<Database>,
     pub(crate) name: String,
 }
 
-impl<'a> Collection<'a> {
-    pub fn new(db: &'a Database, name: String) -> Self {
+impl Collection {
+    pub fn new(db: Arc<Database>, name: String) -> Self {
         Self { db: db, name: name }
     }
 
