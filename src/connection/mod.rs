@@ -94,7 +94,7 @@ impl Connection {
 
             loop {
                 match client.read().await {
-                    Ok((_bytes_read, payload_bytes)) => {
+                    Ok((_bytes_read, _payload_bytes)) => {
                         // Process requests...
                     }
                     Err(e) => {

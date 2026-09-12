@@ -1,10 +1,5 @@
-use std::sync::{Arc, LazyLock, RwLock};
-
-use nosql::{Database, Result, connection::Connection};
+use nosql::{Database, Result};
 use serde::{Deserialize, Serialize};
-
-// static CONNECTIONS: LazyLock<RwLock<>> =
-//     LazyLock::new(|| RwLock::new(Connections::new()));
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {

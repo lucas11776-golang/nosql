@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::de::DeserializeOwned;
 use serde_json::{Value, from_value, json};
 use uuid::Uuid;
 use rayon::prelude::*;
@@ -200,11 +200,13 @@ impl Collection {
     }
 
     pub async fn find(&self, filter: Value) -> Result<Vec<Value>> {
-        let matches = self.find_internal_records(&filter, usize::MAX).await?;
+        let matches = self
+            .find_internal_records(&filter, usize::MAX)
+            .await?;
         Ok(matches.into_iter().map(|(_, doc)| doc).collect())
     }
 
-    pub async fn find_as<'a, T>(&self, filter: Value) -> Result<Vec<T>>
+    pub async fn find_as<T>(&self, filter: Value) -> Result<Vec<T>>
     where 
         T: ?Sized + DeserializeOwned + Send
     {
