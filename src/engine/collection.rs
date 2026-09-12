@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Value, from_value, json};
 use uuid::Uuid;
+use rayon::prelude::*;
 
 use crate::{Database, DeleteResult, InsertResult, RecordId, UpdateResult};
 
@@ -176,13 +178,45 @@ impl Collection {
     }
 
     pub async fn find_one(&self, filter: Value) -> Result<Option<Value>> {
-        let matches = self.find_internal_records(&filter, 1).await?;
+        let matches = self
+            .find_internal_records(&filter, 1)
+            .await?;
         Ok(matches.into_iter().next().map(|(_, doc)| doc))
+    }
+
+    pub async fn find_one_as<T>(&self, filter: Value) -> Result<Option<T>>
+    where
+        T: ?Sized + DeserializeOwned
+    {
+        self
+            .find_one(filter)
+            .await
+            .map(|value| {
+                if let Some(v) = value {
+                    return from_value(v).unwrap()
+                }
+                None
+            })
     }
 
     pub async fn find(&self, filter: Value) -> Result<Vec<Value>> {
         let matches = self.find_internal_records(&filter, usize::MAX).await?;
         Ok(matches.into_iter().map(|(_, doc)| doc).collect())
+    }
+
+    pub async fn find_as<'a, T>(&self, filter: Value) -> Result<Vec<T>>
+    where 
+        T: ?Sized + DeserializeOwned + Send
+    {
+        self
+            .find(filter)
+            .await
+            .map(|values| {
+                values
+                    .par_iter()
+                    .map(|value| from_value(value.clone()).unwrap())
+                    .collect::<Vec<T>>()
+            })
     }
 
     pub async fn update(&self, filter: Value, update: Value) -> Result<UpdateResult> {
