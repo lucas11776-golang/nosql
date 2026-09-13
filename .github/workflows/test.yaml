@@ -4,11 +4,6 @@ on:
   push:
   pull_request:
 
-# Cancel in-progress runs if a new commit is pushed to the same branch/PR
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   test:
     name: Run Test Suite
