@@ -304,3 +304,65 @@ impl Collection {
         Ok(DeleteResult { deleted_count })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use tokio::fs;
+    use crate::Database;
+
+    async fn delete(path: &str) -> Result<(), &'static str> {
+        fs::remove_file(path).await.unwrap();
+        Ok(())
+    }
+
+    async fn db(db_name: &str, collection: &'static str) -> Result<Arc<Database>, &'static str> {
+        let db = Database::open(db_name).await.unwrap();
+        db.create(collection).await.unwrap();
+        Ok(db)
+    }
+
+    #[tokio::test]
+    async fn test_insert_one_document() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "insert.db";
+        let db = Database::open(DB_NAME).await.unwrap();
+        let sub = crate::json!({"email": "jeo@deo.com"});
+
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_insert_many_document() -> Result<(), &'static str> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_find_one_document() -> Result<(), &'static str> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_find_one_as_document() -> Result<(), &'static str> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_find_documents() -> Result<(), &'static str> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_find_as_documents() -> Result<(), &'static str> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_update_document() -> Result<(), &'static str> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn test_delete_document() -> Result<(), &'static str> {
+        todo!()
+    }
+}
