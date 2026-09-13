@@ -182,3 +182,106 @@ impl Database {
         self.bpm.flush_all().await
     }
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use tokio::fs;
+
+    use crate::Database;
+
+    async fn delete(path: &str) -> Result<(), &'static str> {
+        fs::remove_file(path).await.unwrap();
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_open_nosql_database() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "open_db.bin";
+
+        Database::open(DB_NAME).await.unwrap();
+
+        assert_eq!(fs::File::open(DB_NAME).await.is_err(), false);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_create_collection() -> Result<(), &'static str>  {
+        const DB_NAME: &'static str = "create_collection.bin";
+
+        let db = Database::open(DB_NAME).await.unwrap();
+
+        db.create("users").await.unwrap();
+
+        assert_eq!(db.has("users").await, true);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_rename_collection() -> Result<(), &'static str>  {
+        const DB_NAME: &'static str = "rename_db.bin";
+        const COLLECTION_OLD: &'static str = "user";
+        const COLLECTION_NEW: &'static str = "users";
+
+        let db = Database::open(DB_NAME).await.unwrap();
+
+        db.create(COLLECTION_OLD).await.unwrap();
+        db.rename(COLLECTION_OLD, COLLECTION_NEW).await.unwrap();
+
+        assert_eq!(db.has(COLLECTION_OLD).await, false);
+        assert_eq!(db.has(COLLECTION_NEW).await, true);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_list_collection() -> Result<(), &'static str>  {
+        const DB_NAME: &'static str = "list_db.bin";
+        const COLLECTIONS: [&'static str; 2] =  ["users", "password_resets"];
+
+        let db = Database::open(DB_NAME).await.unwrap();
+
+        for collection in COLLECTIONS {
+            db.create(collection).await.unwrap();
+        }
+
+        let list = db.list().await;
+
+        for collection in list {
+            assert_eq!(COLLECTIONS.contains(&collection.as_str()), true);
+        }
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_delete_collection() -> Result<(), &'static str>  {
+        const DB_NAME: &'static str = "delete_db.bin";
+        const COLLECTION: &'static str = "users";
+
+        let db = Database::open(DB_NAME).await.unwrap();
+
+        db.create(COLLECTION).await.unwrap();
+
+        assert_eq!(db.has(COLLECTION).await, true);
+
+        db.delete(COLLECTION).await.unwrap();
+
+        assert_eq!(db.has(COLLECTION).await, false);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+}
