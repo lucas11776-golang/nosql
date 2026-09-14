@@ -1,5 +1,8 @@
-use nosql::{Database, Result};
+use std::str::FromStr;
+
+use nosql::{Database, Result, json};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
@@ -14,17 +17,14 @@ async fn main() -> Result<()> {
 
     let users = db.collection("users").await;
 
-    let usrs = users
-        .find_one_as::<User>(nosql::json!({
-            "email": "peterson-4@gmail.com",
-        }))
-        .await?;
+    let inserted = users
+        .insert_one(json!({"email": "thembangubeni04@gmail.com"}))
+        .await
+        .unwrap();
 
-    // for user in usrs {
-    //     println!("USER: {:?}", user)
-    // }
+    let _id = Uuid::from_str(&inserted.inserted_id.to_string().trim_matches('"')).unwrap();
 
-    println!("USER: {:?}", usrs);
+    println!("\r\n\r\n{:?}\r\n\r\n", inserted.inserted_id);
 
     Ok(())
 }

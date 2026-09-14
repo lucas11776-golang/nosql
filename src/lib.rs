@@ -53,8 +53,8 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn open(db_file: &str) -> Result<Arc<Self>> {
-        let dm = Arc::new(DiskManager::new(db_file)?);
+    pub async fn open(path: &str) -> Result<Arc<Self>> {
+        let dm = Arc::new(DiskManager::new(path)?);
         let bpm = Arc::new(BufferPoolManager::new(10, dm.clone()));
 
         let num_pages = {

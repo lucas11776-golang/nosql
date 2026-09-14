@@ -96,8 +96,8 @@ async fn main() -> Result<()> {
 
     // --- 6. BATCH DELETE ---
     println!("\n--- 4. DELETING DOCUMENTS ---");
-    let delete_res = users.delete(json!({ "role": "developer" })).await?;
-    println!("Batch Delete Result: {:?}", delete_res);
+    // let delete_res = users.delete(json!({ "role": "developer" })).await?;
+    // println!("Batch Delete Result: {:?}", delete_res);
 
     let remaining_users = users.find(json!({})).await?;
     println!("Remaining users in collection:\n{:#?}", remaining_users);

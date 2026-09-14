@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
-use serde::de::DeserializeOwned;
-use serde_json::{Value, from_value, json};
-use uuid::Uuid;
 use rayon::prelude::*;
+use serde::de::DeserializeOwned;
+use serde_json::{Value, from_value};
+use uuid::Uuid;
 
-use crate::{Database, DeleteResult, InsertResult, RecordId, UpdateResult};
+use crate::{Database, DeleteResult, InsertResult, RecordId, UpdateResult, json};
 
 pub struct Collection {
     pub(crate) db: Arc<Database>,
@@ -66,7 +66,12 @@ impl Collection {
         }
 
         let pages = {
-            let catalog = self.db.catalog.read().await;
+            let catalog = self
+                .db
+                .catalog
+                .read()
+                .await;
+
             catalog
                 .collections
                 .get(&self.name)
@@ -112,11 +117,7 @@ impl Collection {
         let mut target_page_id = None;
 
         let pages = {
-            let catalog = self
-                .db
-                .catalog
-                .read()
-                .await;
+            let catalog = self.db.catalog.read().await;
 
             catalog
                 .collections
@@ -178,47 +179,37 @@ impl Collection {
     }
 
     pub async fn find_one(&self, filter: Value) -> Result<Option<Value>> {
-        let matches = self
-            .find_internal_records(&filter, 1)
-            .await?;
+        let matches = self.find_internal_records(&filter, 1).await?;
         Ok(matches.into_iter().next().map(|(_, doc)| doc))
     }
 
     pub async fn find_one_as<T>(&self, filter: Value) -> Result<Option<T>>
     where
-        T: ?Sized + DeserializeOwned
+        T: ?Sized + DeserializeOwned,
     {
-        self
-            .find_one(filter)
-            .await
-            .map(|value| {
-                if let Some(v) = value {
-                    return from_value(v).unwrap()
-                }
-                None
-            })
+        self.find_one(filter).await.map(|value| {
+            if let Some(v) = value {
+                return from_value(v).unwrap();
+            }
+            None
+        })
     }
 
     pub async fn find(&self, filter: Value) -> Result<Vec<Value>> {
-        let matches = self
-            .find_internal_records(&filter, usize::MAX)
-            .await?;
+        let matches = self.find_internal_records(&filter, usize::MAX).await?;
         Ok(matches.into_iter().map(|(_, doc)| doc).collect())
     }
 
     pub async fn find_as<T>(&self, filter: Value) -> Result<Vec<T>>
-    where 
-        T: ?Sized + DeserializeOwned + Send
+    where
+        T: ?Sized + DeserializeOwned + Send,
     {
-        self
-            .find(filter)
-            .await
-            .map(|values| {
-                values
-                    .par_iter()
-                    .map(|value| from_value(value.clone()).unwrap())
-                    .collect::<Vec<T>>()
-            })
+        self.find(filter).await.map(|values| {
+            values
+                .par_iter()
+                .map(|value| from_value(value.clone()).unwrap())
+                .collect::<Vec<T>>()
+        })
     }
 
     pub async fn update(&self, filter: Value, update: Value) -> Result<UpdateResult> {
@@ -268,9 +259,7 @@ impl Collection {
     }
 
     pub async fn delete(&self, filter: Value) -> Result<DeleteResult> {
-        let matches = self
-            .find_internal_records(&filter, usize::MAX)
-            .await?;
+        let matches = self.find_internal_records(&filter, usize::MAX).await?;
 
         if matches.is_empty() {
             return Ok(DeleteResult { deleted_count: 0 });
@@ -307,62 +296,105 @@ impl Collection {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::str::FromStr;
+
+use crate::{Database, engine::collection::Collection};
+    use serde_json::json;
     use tokio::fs;
-    use crate::Database;
+use uuid::Uuid;
 
     async fn delete(path: &str) -> Result<(), &'static str> {
-        fs::remove_file(path).await.unwrap();
+        if let Err(err) = fs::remove_file(path).await {}
+
         Ok(())
     }
 
-    async fn db(db_name: &str, collection: &'static str) -> Result<Arc<Database>, &'static str> {
+    async fn collection(
+        db_name: &str,
+        collection: &'static str,
+    ) -> Result<Collection, &'static str> {
         let db = Database::open(db_name).await.unwrap();
         db.create(collection).await.unwrap();
-        Ok(db)
+        Ok(db.collection(collection).await)
     }
 
+    // TODO: should test if _id is uuid_v4
     #[tokio::test]
     async fn test_insert_one_document() -> Result<(), &'static str> {
-        const DB_NAME: &'static str = "insert.db";
-        let db = Database::open(DB_NAME).await.unwrap();
-        let sub = crate::json!({"email": "jeo@deo.com"});
+        const DB_NAME: &'static str = "insert_one.bin";
+        const EMAIL: &'static str = "jeo@deo.com";
 
-        todo!()
+        let collection = collection(DB_NAME, "subscriptions").await.unwrap();
+
+        // Radom Generated `_id` UUID V4
+        let result = collection
+            .insert_one(json!({"email": EMAIL}))
+            .await
+            .unwrap();
+
+        let uuid = Uuid::from_str(&result.inserted_id.to_string().trim_matches('"'));
+
+        assert_eq!(uuid.is_ok(), true);
+
+        // Custom Generated `_id` 
+        const ID: &'static str = "custom-id-1";
+
+        let result = collection
+            .insert_one(json!({"_id": ID, "email": EMAIL}))
+            .await
+            .unwrap();
+
+        assert_eq!(ID, result.inserted_id);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_insert_many_document() -> Result<(), &'static str> {
-        todo!()
+        const DB_NAME: &'static str = "insert_many.bin";
+        const EMAILS: [&'static str; 2] = ["jeo@deo.com", "jane@deo.com"];
+
+        let collection = collection(DB_NAME, "subscriptions").await.unwrap();
+
+        let subscriptions = collection
+            .insert_many(vec![
+                json!({"email": EMAILS[0]}),
+                json!({"email": EMAILS[1]}),
+            ])
+            .await
+            .unwrap();
+
+        assert_eq!(subscriptions.len(), 2);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
     }
 
-    #[tokio::test]
-    async fn test_find_one_document() -> Result<(), &'static str> {
-        todo!()
-    }
+    // #[tokio::test]
+    // async fn test_find_one_as_document() -> Result<(), &'static str> {
+    //     todo!()
+    // }
 
-    #[tokio::test]
-    async fn test_find_one_as_document() -> Result<(), &'static str> {
-        todo!()
-    }
+    // #[tokio::test]
+    // async fn test_find_documents() -> Result<(), &'static str> {
+    //     todo!()
+    // }
 
-    #[tokio::test]
-    async fn test_find_documents() -> Result<(), &'static str> {
-        todo!()
-    }
+    // #[tokio::test]
+    // async fn test_find_as_documents() -> Result<(), &'static str> {
+    //     todo!()
+    // }
 
-    #[tokio::test]
-    async fn test_find_as_documents() -> Result<(), &'static str> {
-        todo!()
-    }
+    // #[tokio::test]
+    // async fn test_update_document() -> Result<(), &'static str> {
+    //     todo!()
+    // }
 
-    #[tokio::test]
-    async fn test_update_document() -> Result<(), &'static str> {
-        todo!()
-    }
-
-    #[tokio::test]
-    async fn test_delete_document() -> Result<(), &'static str> {
-        todo!()
-    }
+    // #[tokio::test]
+    // async fn test_delete_document() -> Result<(), &'static str> {
+    //     todo!()
+    // }
 }
