@@ -298,14 +298,15 @@ impl Collection {
 mod tests {
     use std::str::FromStr;
 
-use crate::{Database, engine::collection::Collection};
-    use serde_json::json;
+    use serde::{Deserialize, Serialize};
+use serde_json::json;
     use tokio::fs;
-use uuid::Uuid;
+    use uuid::Uuid;
+
+    use crate::{Database, engine::collection::{self, Collection}};
 
     async fn delete(path: &str) -> Result<(), &'static str> {
-        if let Err(err) = fs::remove_file(path).await {}
-
+        if let Err(_) = fs::remove_file(path).await {}
         Ok(())
     }
 
@@ -318,7 +319,6 @@ use uuid::Uuid;
         Ok(db.collection(collection).await)
     }
 
-    // TODO: should test if _id is uuid_v4
     #[tokio::test]
     async fn test_insert_one_document() -> Result<(), &'static str> {
         const DB_NAME: &'static str = "insert_one.bin";
@@ -332,9 +332,7 @@ use uuid::Uuid;
             .await
             .unwrap();
 
-        let uuid = Uuid::from_str(&result.inserted_id.to_string().trim_matches('"'));
-
-        assert_eq!(uuid.is_ok(), true);
+        assert_eq!(Uuid::from_str(&result.inserted_id.to_string().trim_matches('"')).is_ok(), true);
 
         // Custom Generated `_id` 
         const ID: &'static str = "custom-id-1";
@@ -358,7 +356,7 @@ use uuid::Uuid;
 
         let collection = collection(DB_NAME, "subscriptions").await.unwrap();
 
-        let subscriptions = collection
+        let results = collection
             .insert_many(vec![
                 json!({"email": EMAILS[0]}),
                 json!({"email": EMAILS[1]}),
@@ -366,22 +364,123 @@ use uuid::Uuid;
             .await
             .unwrap();
 
-        assert_eq!(subscriptions.len(), 2);
+        assert_eq!(results.len(), 2);
+
+        for result in results {
+            assert_eq!(Uuid::from_str(&result.inserted_id.to_string().trim_matches('"')).is_ok(), true);
+        }
 
         delete(DB_NAME).await.unwrap();
 
         Ok(())
     }
 
-    // #[tokio::test]
-    // async fn test_find_one_as_document() -> Result<(), &'static str> {
-    //     todo!()
-    // }
+    #[tokio::test]
+    async fn test_find_one_documents() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "find_one.bin";
+        const EMAIL: &'static str = "hello@example.com";
 
-    // #[tokio::test]
-    // async fn test_find_documents() -> Result<(), &'static str> {
-    //     todo!()
-    // }
+        let collection = collection(DB_NAME, "subscriptions").await.unwrap();
+
+        let result = collection
+            .insert_one(json!({"email": EMAIL}))
+            .await
+            .unwrap();
+
+        let subscription = collection
+            .find_one(json!({"_id": result.inserted_id}))
+            .await
+            .unwrap();
+
+
+        assert_eq!(subscription.is_some(), true);
+        assert_eq!(subscription.unwrap().get("email").unwrap(), EMAIL);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_find_one_as_document() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "find_one.bin";
+        const EMAIL: &'static str = "hello@example.com";
+
+        let collection = collection(DB_NAME, "subscriptions").await.unwrap();
+
+        let result = collection
+            .insert_one(json!({"email": EMAIL}))
+            .await
+            .unwrap();
+
+        #[derive(Deserialize, Serialize)]
+        pub struct Subscription {
+            pub _id: String,
+            pub email: String,
+        }
+
+        let subscription = collection
+            .find_one_as::<Subscription>(json!({"_id": result.inserted_id}))
+            .await
+            .unwrap();
+
+        assert_eq!(subscription.is_some(), true);
+
+        let sub = subscription.unwrap();
+
+        assert_eq!(sub._id, result.inserted_id);
+        assert_eq!(sub.email, EMAIL);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_find_documents() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "find.bin";
+        // const COMPANIES: [&'static str; 2] = ["hello@company.co.za", "help@company.co.za"];
+
+        let collection = collection(DB_NAME, "users").await.unwrap();
+
+        let mut guests: Vec<crate::Value> = Vec::new();
+
+        // Generate 20 Guest accounts
+        for i in 0..20 {
+            guests.push(json!({
+                "email": format!("guest-{}@company.com", i),
+                "role": "guest"
+            }));
+        }
+
+        let mut admins: Vec<crate::Value> = Vec::new();
+
+        // Generate 5 Guest accounts
+        for i in 0..3 {
+            admins.push(json!({
+                "email": format!("admin-{}@company.com", i),
+                "role": "admin"
+            }));
+        }
+
+        collection.insert_many(guests).await.unwrap();
+        collection.insert_many(admins).await.unwrap();
+
+        let guest_accounts = collection.find(json!({
+            "role": "guest"
+        })).await.unwrap();
+
+        let admin_accounts= collection.find(json!({
+            "role": "admin"
+        })).await.unwrap();
+
+        assert_eq!(guest_accounts.len(), 20);
+        assert_eq!(admin_accounts.len(), 3);
+
+        delete(DB_NAME).await.unwrap();
+        
+        Ok(())
+    }
 
     // #[tokio::test]
     // async fn test_find_as_documents() -> Result<(), &'static str> {
