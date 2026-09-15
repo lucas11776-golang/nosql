@@ -303,17 +303,14 @@ use serde_json::json;
     use tokio::fs;
     use uuid::Uuid;
 
-    use crate::{Database, engine::collection::{self, Collection}};
+    use crate::{Database, engine::collection::Collection};
 
     async fn delete(path: &str) -> Result<(), &'static str> {
         if let Err(_) = fs::remove_file(path).await {}
         Ok(())
     }
 
-    async fn collection(
-        db_name: &str,
-        collection: &'static str,
-    ) -> Result<Collection, &'static str> {
+    async fn collection(db_name: &str, collection: &'static str) -> Result<Collection, &'static str> {
         let db = Database::open(db_name).await.unwrap();
         db.create(collection).await.unwrap();
         Ok(db.collection(collection).await)
@@ -392,7 +389,6 @@ use serde_json::json;
             .await
             .unwrap();
 
-
         assert_eq!(subscription.is_some(), true);
         assert_eq!(subscription.unwrap().get("email").unwrap(), EMAIL);
 
@@ -403,7 +399,7 @@ use serde_json::json;
 
     #[tokio::test]
     async fn test_find_one_as_document() -> Result<(), &'static str> {
-        const DB_NAME: &'static str = "find_one.bin";
+        const DB_NAME: &'static str = "find_one_as.bin";
         const EMAIL: &'static str = "hello@example.com";
 
         let collection = collection(DB_NAME, "subscriptions").await.unwrap();
@@ -439,8 +435,6 @@ use serde_json::json;
     #[tokio::test]
     async fn test_find_documents() -> Result<(), &'static str> {
         const DB_NAME: &'static str = "find.bin";
-        // const COMPANIES: [&'static str; 2] = ["hello@company.co.za", "help@company.co.za"];
-
         let collection = collection(DB_NAME, "users").await.unwrap();
 
         let mut guests: Vec<crate::Value> = Vec::new();
@@ -463,8 +457,8 @@ use serde_json::json;
             }));
         }
 
-        collection.insert_many(guests).await.unwrap();
-        collection.insert_many(admins).await.unwrap();
+        collection.insert_many(guests.clone()).await.unwrap();
+        collection.insert_many(admins.clone()).await.unwrap();
 
         let guest_accounts = collection.find(json!({
             "role": "guest"
@@ -477,23 +471,157 @@ use serde_json::json;
         assert_eq!(guest_accounts.len(), 20);
         assert_eq!(admin_accounts.len(), 3);
 
+        // Check guest fields
+        for (i, value) in guests.iter().enumerate() {
+            assert_eq!(guest_accounts[i].get("email").unwrap(), value.get("email").unwrap());
+            assert_eq!(guest_accounts[i].get("role").unwrap(), value.get("role").unwrap());
+        }
+
+        // Check admin fields
+        for (i, value) in admins.iter().enumerate() {
+            assert_eq!(admin_accounts[i].get("email").unwrap(), value.get("email").unwrap());
+            assert_eq!(admin_accounts[i].get("role").unwrap(), value.get("role").unwrap());
+        }
+
         delete(DB_NAME).await.unwrap();
         
         Ok(())
     }
 
-    // #[tokio::test]
-    // async fn test_find_as_documents() -> Result<(), &'static str> {
-    //     todo!()
-    // }
+    #[tokio::test]
+    async fn test_find_as_documents() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "find_as.bin";
+        let collection = collection(DB_NAME, "users").await.unwrap();
 
-    // #[tokio::test]
-    // async fn test_update_document() -> Result<(), &'static str> {
-    //     todo!()
-    // }
+        let mut guests: Vec<crate::Value> = Vec::new();
 
-    // #[tokio::test]
-    // async fn test_delete_document() -> Result<(), &'static str> {
-    //     todo!()
-    // }
+        // Generate 20 Guest accounts
+        for i in 0..20 {
+            guests.push(json!({
+                "email": format!("guest-{}@company.com", i),
+                "role": "guest"
+            }));
+        }
+
+        let mut admins: Vec<crate::Value> = Vec::new();
+
+        // Generate 5 Guest accounts
+        for i in 0..3 {
+            admins.push(json!({
+                "email": format!("admin-{}@company.com", i),
+                "role": "admin"
+            }));
+        }
+
+        collection.insert_many(guests.clone()).await.unwrap();
+        collection.insert_many(admins.clone()).await.unwrap();
+
+        #[derive(Debug, Serialize, Deserialize)]
+        pub struct User {
+            pub _id: String,
+            pub email: String,
+            pub role: String,
+        }
+
+        let guest_accounts = collection.find_as::<User>(json!({
+            "role": "guest"
+        })).await.unwrap();
+
+        let admin_accounts= collection.find_as::<User>(json!({
+            "role": "admin"
+        })).await.unwrap();
+
+        assert_eq!(guest_accounts.len(), 20);
+        assert_eq!(admin_accounts.len(), 3);
+
+        // Check guest fields
+        for (i, value) in guests.iter().enumerate() {
+            assert_eq!(guest_accounts[i].email, value.get("email").unwrap().to_string().trim_matches('"'));
+            assert_eq!(guest_accounts[i].role, value.get("role").unwrap().to_string().trim_matches('"'));
+        }
+
+        // Check admin fields
+        for (i, value) in admins.iter().enumerate() {
+            assert_eq!(admin_accounts[i].email, value.get("email").unwrap().to_string().trim_matches('"'));
+            assert_eq!(admin_accounts[i].role, value.get("role").unwrap().to_string().trim_matches('"'));
+        }
+
+        delete(DB_NAME).await.unwrap();
+        
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_update_document() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "update.bin";
+        let collection = collection(DB_NAME, "users").await.unwrap();
+
+        #[derive(Debug, Serialize, Deserialize)]
+        pub struct User {
+            pub _id: String,
+            pub email: String,
+            pub password: String,
+        }
+
+        // Generate 5 accounts
+        for i in 0..5 {
+            collection.insert_one(json!({
+                "email": format!("employee-{}@company.com", i),
+                "password": format!("password#{}", 1)
+            })).await.unwrap();
+        }
+
+        // Updated second account password
+        let result = collection.update(
+            json!({"email": "employee-2@company.com"}),
+            json!({"password": "test@123"}),
+        ).await.unwrap();
+
+        assert_eq!(result.matched_count, 1);
+        assert_eq!(result.modified_count, 1);
+
+        let user = collection.find_one_as::<User>(json!({
+            "email": "employee-2@company.com"
+        })).await.unwrap().unwrap();
+
+        assert_eq!("test@123", user.password);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_document() -> Result<(), &'static str> {
+        const DB_NAME: &'static str = "update.bin";
+        let collection = collection(DB_NAME, "users").await.unwrap();
+
+        // Generate 5 inactive
+        for i in 0..5 {
+            collection.insert_one(json!({
+                "email": format!("test-{}@company.com", i),
+                "status": "inactive",
+                "password": format!("password#{}", 1)
+            })).await.unwrap();
+        }
+
+        // Generate 20 active
+        for i in 0..20 {
+            collection.insert_one(json!({
+                "email": format!("employee-{}@company.com", i),
+                "status": "active",
+                "password": format!("password#{}", 1)
+            })).await.unwrap();
+        }
+
+        let result = collection.delete(json!({
+            "status": "inactive",
+        })).await.unwrap();
+
+        assert_eq!(result.deleted_count, 5);
+
+        delete(DB_NAME).await.unwrap();
+
+        Ok(())
+    }
 }
